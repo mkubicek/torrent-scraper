@@ -13,11 +13,17 @@ function getMagnet(link, cb) {
                 gzip: true
         }, function(err, res) {
 		if(err) {
-			return cb(true, null);
+			return cb(true, null, null);
 		}
                 $ = cheerio.load(res.body);
 		var magnet = $('div.p div.btn-group a:nth-child(2)').attr('href');
-		cb(null, magnet);
+                
+                var hashStr = $('div.text-muted').filter(function() {
+                        return $(this).text().indexOf('Hash') > -1;
+                }).text();
+                var hash = hashStr.slice(5,-1)
+
+		cb(null, magnet, hash);
         });
 }
 
@@ -29,7 +35,7 @@ function getMagnets(torrents, limit, cb) {
 	
 	if(torrents.length == 0) return cb(null, []);
 
-        function _callback(err, t, magnet) {
+        function _callback(err, t, magnet, hash) {
                 finished_count++;
                 if(!err) {
 			entries.push({
@@ -38,13 +44,14 @@ function getMagnets(torrents, limit, cb) {
                         	magnet: magnet,
                         	seeders: t.seeders,
                         	leechers: null,
-                        	files: null
+                        	files: null,
+                                hash: hash
                 	});
 		}
                 if(torrents.length > 0) {
                         var torrent = torrents.pop();
-                        getMagnet(torrent.link, function(magnet) {
-                                _callback(torrent, magnet);
+                        getMagnet(torrent.link, function(magnet, hash) {
+                                _callback(torrent, magnet, hash);
                         });
                 } else if(finished_count == torrent_count && !finished) {
                         cb(null, entries);
@@ -53,8 +60,8 @@ function getMagnets(torrents, limit, cb) {
 
         for(var i = 0; i < torrents.length && i < limit; i++) {
                 (function(t) {
-                        getMagnet(t.link, function(err, magnet) {
-                                _callback(err, t, magnet);
+                        getMagnet(t.link, function(err, magnet, hash) {
+                                _callback(err, t, magnet, hash);
                         });
                 })(torrents.pop());
         }
